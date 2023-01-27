@@ -1,9 +1,11 @@
 import os
+import sys
+
 from mutagen.easyid3 import EasyID3
 from mutagen.id3._util import ID3NoHeaderError
 
 
-DIR = "..\dj"
+DIR = "..\dj" # default directory
 
 
 def write_tags(file):
@@ -37,8 +39,13 @@ def update_tags(directory):
 
 
 def main():
-    directory = os.path.join(os.getcwd(), DIR)
-    update_tags(directory)
+    if len(sys.argv) > 1:
+        dirs = sys.argv[1:]
+    else:
+        dirs = [os.path.join(os.getcwd(), DIR)]
+
+    for dir in dirs:
+        update_tags(dir)
 
 
 if __name__ == "__main__":

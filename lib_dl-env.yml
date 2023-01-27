@@ -5,4 +5,5 @@ channels:
   - defaults
 dependencies:
   - yt-dlp
-  - beautifulsoup4
+  - bs4
+  - requests

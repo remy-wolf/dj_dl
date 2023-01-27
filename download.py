@@ -22,11 +22,10 @@ class RenameAndWriteTagsPP(PostProcessor):
             contents = os.path.basename(filepath).split(" - ")
             if len(contents) >= 3:
                 if contents[1] == 'Topic':
-                    filename = f"{contents[0]} - {contents[2:]}" # if downloading from 'Topic' channel, remove 'Topic'
+                    del contents[1] # if downloading from 'Topic' channel, remove 'Topic' and use uploader name as artist
                 else:
-                    filename = " - ".join(contents[1:])  # artist and title included
-            else:
-                filename = " - ".join(contents[:1]) # if no artist name, include uploader name
+                    del contents[0] # otherwise, remove uploader name
+            filename = " - ".join(contents)
             
             filename = os.path.join(os.path.dirname(filepath), filename)
 
