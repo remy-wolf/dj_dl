@@ -12,7 +12,7 @@ goto end
 )
 
 set /p target="Enter playlist or videos to download: "
-call python download.py %target%
+call python scripts\download.py %target%
 call conda deactivate
 echo Finished.
 

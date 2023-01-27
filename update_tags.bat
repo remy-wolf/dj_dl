@@ -13,7 +13,7 @@ goto end
 
 set DEFAULT_FOLDER=..\dj
 set /p target="Enter folder containing music, or leave blank to use default folder (%DEFAULT_FOLDER%): "
-call python update_tags.py %target%
+call python scripts\update_tags.py %target%
 call conda deactivate
 echo Finished.
 
