@@ -55,9 +55,7 @@ class RenameAndWriteTagsPP(PostProcessor):
         return [], info  # return list_of_files_to_delete, info_dict
 
 
-def main():
-    URLS = sys.argv[1:]
-
+def download(urls):
     ydl_opts = {
         'format': 'mp3/bestaudio/best',
         'extractaudio': True,
@@ -77,7 +75,11 @@ def main():
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.add_post_processor(RenameAndWriteTagsPP())
-        error_code = ydl.download(URLS)
+        error_code = ydl.download(urls)
+
+
+def main():
+    download(sys.argv[1:])
 
 
 if __name__ == "__main__":

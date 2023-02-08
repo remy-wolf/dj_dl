@@ -7,3 +7,4 @@ dependencies:
   - yt-dlp
   - bs4
   - requests
+  - spotipy
