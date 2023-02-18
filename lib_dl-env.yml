@@ -1,10 +1,8 @@
-
 name: lib_dl
 channels:
   - conda-forge
   - defaults
 dependencies:
   - yt-dlp
-  - bs4
-  - requests
+  - ytmusicapi
   - spotipy

@@ -1,60 +1,119 @@
 import sys
 import os
+import string
 
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
-import yt_dlp
+from ytmusicapi import YTMusic
+# import yt_dlp
 
 from download import download
 from credentials import CLIENT_ID, CLIENT_SECRET
 
 
-INCLUDE_EXTENDED_MIX = True
-NUM_ENTRIES = 3
-
-
-def main():
-    url = sys.argv[1]
-
+# get tracks from spotify playlist
+def get_tracks(playlist_url):
     client_credentials_manager = SpotifyClientCredentials(client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
     sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
 
-    playlist = sp.playlist_tracks(url, fields="items(track(name, artists.name))")['items']
+    results = sp.playlist_tracks(playlist_url, fields="items(track(name, artists.name, duration_ms)), next")
+    tracks = []
+    while results:
+        tracks.extend([t['track'] for t in results['items']])
+        results = sp.next(results)
 
-    ydl_opts = {
-        'format': 'mp3/bestaudio/best',
-        'quiet': True,
-    }
+    return tracks
 
+
+# used for scoring youtube results based on original spotify song
+EXTENDED_MIX = 4
+CLEAN_VERSION = 4
+TITLE_MATCH = 3
+SONG_RESULT = 1
+DURATION_MATCH = 1
+RADIO_EDIT = -2
+MUSIC_VIDEO = -4
+EXTENDED_SEARCH_TERMS = ['extended', 'original', 'club mix', 'club edit']
+RADIO_SEARCH_TERMS = ['radio edit', 'radio mix', 'radio version']
+REMIX_TERMS = ['remix', 'flip', 'mashup', 'bootleg']
+# compare result from youtube based on expected result from spotify
+def rank_video(yt_result, sp_result, extended_mix = False, clean_version = False):
+    yt_artists = [artist['name'].lower() for artist in yt_result['artists']]
+    sp_artists = [artist['name'].lower() for artist in sp_result['artists']]
+    yt_title = yt_result['title'].lower().translate(str.maketrans('', '', string.punctuation)).replace('  ', ' ')
+    sp_title = sp_result['name'].lower().translate(str.maketrans('', '', string.punctuation)).replace('  ', ' ')
+    yt_title_terms = yt_title.split(' ')
+    sp_title_terms = sp_title.split(' ')
+    yt_duration = yt_result['duration_seconds']
+    sp_duration = sp_result['duration_ms'] / 1000
+    duration_min = sp_duration - 5
+    duration_max = sp_duration + 5
+    if extended_mix:
+        duration_max *= 2
+
+    score = 0
+    # TODO: wilkinson & sharleen hector edge case
+    if not any (sp_artist in yt_artists or sp_artist in yt_title for sp_artist in sp_artists): return -1 # ignore results that don't have at least artist match
+    if not sp_title_terms[0] in yt_title_terms: return -1 # ignore results that don't match at least part of the title
+    if any ((term in yt_title_terms) != (term in sp_title_terms) for term in REMIX_TERMS): return -1 # ignore results that are remixes when they shouln't be, and vice versa
+    if (extended_mix and (any (x in yt_title for x in EXTENDED_SEARCH_TERMS) or yt_duration >= duration_min + 40)):
+        score += EXTENDED_MIX
+    if clean_version and not yt_result['isExplicit']: score += CLEAN_VERSION
+    if yt_title in sp_title or sp_title in yt_title: score += TITLE_MATCH
+    if yt_result['resultType'] == 'song': score += SONG_RESULT
+    if yt_duration >= duration_min and yt_duration <= duration_max: score += DURATION_MATCH # allow small duration buffer
+    if any (x in yt_title for x in RADIO_SEARCH_TERMS): score += RADIO_EDIT
+    if 'music video' in yt_title: score += MUSIC_VIDEO
+    return score
+
+
+def search_yt(sp_tracks, search_for_extended_mix = False, search_for_clean_version = False):
+    ytmusic = YTMusic()
     urls = []
     skipped = []
-    with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-        for song in playlist:
-            song = song['track']
-            artists = ', '.join([artist['name'] for artist in song['artists']])
-            title = song['name']
-            partial = f"{artists} - {title}"
-            search_term = partial
-            if INCLUDE_EXTENDED_MIX:
-                search_term = f"{search_term} (Extended Mix)"
-            print(f"Searching for {partial}...")
-            # TODO: use youtube music search exclusively?
-            videos = ydl.extract_info(f"ytsearch{NUM_ENTRIES}:{search_term}", download=False)
-            found = False
-            for entry in videos['entries']:
-                print(f"Found {entry['title']} (url: {entry['original_url']}).")
-                correct = input("Correct video? Hit enter or type 'y' if so: ")
-                if (correct == '' or correct[0].lower() == 'y'):
-                    urls.append(entry['original_url'])
-                    found = True
-                    break
-            if not found:
-                print(f"Skipping {partial}.")
-                skipped.append(partial)
-    
+    for sp_track in sp_tracks:
+        sp_artists = ', '.join([artist['name'] for artist in sp_track['artists']])
+        sp_title = sp_track['name']
+        
+        partial = f"{sp_artists} - {sp_title}"
+        search_term = partial
+        if search_for_extended_mix:
+            search_term = f"{search_term} Extended Mix"
+        if search_for_clean_version:
+            search_term = f"{search_term} Clean"
+        print(f"Searching for {partial}...")
+        yt_results = ytmusic.search(search_term, filter="songs")[:5]
+        yt_results.extend(ytmusic.search(search_term, filter="videos")[:3])
+        best_score = 0 # don't take videos with negative score
+        best_result = None
+        for yt_res in yt_results:
+            score = rank_video(yt_res, sp_track, search_for_extended_mix, search_for_clean_version)
+            # artists = ', '.join([artist['name'].lower() for artist in yt_res['artists']])
+            # title = yt_res['title']
+            # url = f"www.youtube.com/watch?v={yt_res['videoId']}"
+            # print(f"{artists} - {title} (score: {score}) (url: {url}).")
+            if score > best_score:
+                best_result = yt_res
+                best_score = score
+        if best_result:
+            artists = ', '.join([artist['name'].lower() for artist in best_result['artists']])
+            title = best_result['title']
+            url = f"https://www.youtube.com/watch?v={best_result['videoId']}"
+            print(f"Found {artists} - {title} (score: {best_score}) (url: {url}).")
+            urls.append(url)
+        else:
+            print(f"No good video found for {partial} - skipping.")
+            skipped.append(partial)
+    return urls, skipped
+
+def main():
+    url = sys.argv[1]
+    tracks = get_tracks(url)
+    urls, skipped = search_yt(tracks, search_for_extended_mix = True)
     download(urls)
-    skipped = [f"\n    {title}" for title in skipped]
+    skipped = ''.join(f"\n    {title}" for title in skipped)
     print(f"Videos skipped: {skipped}")
+    print("Done.")
 
 
 if __name__ == "__main__":

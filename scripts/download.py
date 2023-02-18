@@ -42,6 +42,8 @@ class RenameAndWriteTagsPP(PostProcessor):
                 self.to_screen(f"Renamed {filepath} to {filename}")
             except UnicodeEncodeError:
                 self.to_screen("Renamed song with non-English characters")
+            except FileExistsError:
+                self.to_screen(f"Possible duplicate: {filepath}, cannot rename")
 
             # write id3 tags
             if write_tags(filename):
