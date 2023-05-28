@@ -12,8 +12,7 @@ echo conda env create -f lib_dl.yml
 goto end
 )
 
-set /p target="Enter playlist to download: "
-call python scripts\scrape_spotify.py %target%
+call python scripts\scrape_spotify.py
 call conda deactivate
 echo Finished.
 
