@@ -6,3 +6,5 @@ dependencies:
   - yt-dlp
   - ytmusicapi
   - spotipy
+  - ffmpeg
+  - ffprobe
