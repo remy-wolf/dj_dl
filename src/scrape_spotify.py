@@ -1,19 +1,19 @@
-import sys
 import os
 import string
 
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
-# import yt_dlp
+from dotenv import dotenv_values
 
-from download import download
-from credentials import CLIENT_ID, CLIENT_SECRET
+from download_youtube import download_youtube
+
+secrets = dotenv_values(os.path.join('src', '.env'))
 
 
 # get tracks from spotify playlist
-def get_tracks(playlist_url, start=None, end=None):
-    client_credentials_manager = SpotifyClientCredentials(client_id=CLIENT_ID, client_secret=CLIENT_SECRET)
+def get_playlist_tracks(playlist_url, start=None, end=None):
+    client_credentials_manager = SpotifyClientCredentials(client_id=secrets['SPOTIPY_CLIENT_ID'], client_secret=secrets['SPOTIPY_CLIENT_SECRET'])
     sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
 
     if not start:
@@ -25,13 +25,14 @@ def get_tracks(playlist_url, start=None, end=None):
         limit = end - start
         total_tracks = limit
 
-    results = sp.playlist_tracks(playlist_url, fields="items(track(name, artists.name, duration_ms)), next", limit=limit, offset=start)
+    playlist_name = sp.user_playlist(user=None, playlist_id=playlist_url, fields="name")['name']
+    results = sp.playlist_tracks(playlist_url, fields="name, items(track(name, artists.name, duration_ms)), next", limit=limit, offset=start)
     tracks = []
     while results and (not total_tracks or len(tracks) < total_tracks):
         tracks.extend([t['track'] for t in results['items']])
         results = sp.next(results)
 
-    return tracks
+    return playlist_name, tracks
 
 
 # used for scoring youtube results based on original spotify song
@@ -80,54 +81,41 @@ def rank_video(yt_result, sp_result, extended_mix = False, clean_version = False
     return score
 
 
-def search_yt(sp_tracks, search_for_extended_mix = False, search_for_clean_version = False):
+def search_yt(sp_track, search_for_extended_mix = False, search_for_clean_version = False):
     ytmusic = YTMusic()
-    urls = []
-    skipped = []
-    for sp_track in sp_tracks:
-        sp_artists = ', '.join([artist['name'] for artist in sp_track['artists']])
-        sp_title = sp_track['name']
-        
-        partial = f"{sp_artists} - {sp_title}"
-        search_term = partial
-        if search_for_extended_mix:
-            search_term = f"{search_term} Extended Mix"
-        if search_for_clean_version:
-            search_term = f"{search_term} Clean"
-        print(f"Searching for {partial}...")
-        yt_results = ytmusic.search(search_term, filter="songs")[:5]
-        yt_results.extend(ytmusic.search(search_term, filter="videos")[:3])
-        best_score = 0 # don't take videos with negative score
-        best_result = None
-        for yt_res in yt_results:
-            score = rank_video(yt_res, sp_track, search_for_extended_mix, search_for_clean_version)
-            # artists = ', '.join([artist['name'].lower() for artist in yt_res['artists']])
-            # title = yt_res['title']
-            # url = f"www.youtube.com/watch?v={yt_res['videoId']}"
-            # print(f"{artists} - {title} (score: {score}) (url: {url}).")
-            if score > best_score:
-                best_result = yt_res
-                best_score = score
-        if best_result:
-            artists = ', '.join([artist['name'].lower() for artist in best_result['artists']])
-            title = best_result['title']
-            url = f"https://www.youtube.com/watch?v={best_result['videoId']}"
-            print(f"Found {artists} - {title} (score: {best_score}) (url: {url}).")
-            urls.append(url)
-        else:
-            print(f"No good video found for {partial} - skipping.")
-            skipped.append(partial)
-    return urls, skipped
+    sp_artists = ', '.join([artist['name'] for artist in sp_track['artists']])
+    sp_title = sp_track['name']
+    
+    partial = f"{sp_artists} - {sp_title}"
+    search_term = partial
+    if search_for_extended_mix:
+        search_term = f"{search_term} Extended Mix"
+    if search_for_clean_version:
+        search_term = f"{search_term} Clean"
+    print(f"Searching for {partial}...")
+    yt_results = ytmusic.search(search_term, filter="songs")[:5]
+    yt_results.extend(ytmusic.search(search_term, filter="videos")[:3])
+    best_score = 0 # don't take videos with negative score
+    best_result = None
+    for yt_res in yt_results:
+        score = rank_video(yt_res, sp_track, search_for_extended_mix, search_for_clean_version)
+        if score > best_score:
+            best_result = yt_res
+            best_score = score
+    if not best_result:
+        print(f"No good match found for {partial} - skipping.")
+        return partial, True
 
-def main():
-    url=input("Enter playlist to download: ")
-    extended=input("Search for extended mix? (Good for house/techno) (Y/N): ")
-    clean=input("Search for clean version? (Y/N): ")
+    artists = ', '.join([artist['name'].lower() for artist in best_result['artists']])
+    title = best_result['title']
+    url = f"https://www.youtube.com/watch?v={best_result['videoId']}"
+    print(f"Found {artists} - {title} (score: {best_score}) (url: {url}).")
+    return url, False
+
+
+def handle_playlist(url, search_for_extended_mix = False, search_for_clean_version = False):
     start=input("Playlist start number (or hit enter to download from beginning of playlist): ")
     end=input("Playlist end number (or hit enter to download through end of playlist): ")
-
-    search_for_extended_mix = len(extended) > 0 and extended[0].lower() == 'y'
-    search_for_clean_version = len(clean) > 0 and clean[0].lower() == 'y'
 
     if len(start) == 0:
         start = None
@@ -138,13 +126,48 @@ def main():
     else:
         end = int(end) - 1
 
-    tracks = get_tracks(url, start, end)
-    urls, skipped = search_yt(tracks, search_for_extended_mix, search_for_clean_version)
-    download(urls)
-    skipped = ''.join(f"\n    {title}" for title in skipped)
-    print(f"Videos skipped: {skipped}")
-    print("Done.")
+    urls = []
+    skipped = []
+    playlist_name, tracks = get_playlist_tracks(url, start, end)
+    print(f"\nSearching for matches on YouTube for tracks in '{playlist_name}'...\n")
+    for track in tracks:
+        url_or_title, skip = search_yt(track, search_for_extended_mix, search_for_clean_version)
+        if skip:
+            skipped.append(url_or_title)
+        else:
+            urls.append(url_or_title)
+    print("\nDownloading tracks from YouTube...\n")
+    download_youtube(urls, playlist_name)
+    if len(skipped) > 0:
+        skipped = ''.join(f"\n    {title}" for title in skipped)
+        print(f"Could not find a high-quality match for the following tracks (and did not download): {skipped}")
 
 
-if __name__ == "__main__":
-    main()
+def handle_track(url, search_for_extended_mix = False, search_for_clean_version = False):
+    client_credentials_manager = SpotifyClientCredentials(client_id=secrets['SPOTIPY_CLIENT_ID'], client_secret=secrets['SPOTIPY_CLIENT_SECRET'])
+    sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
+    track = sp.tracks([url])['tracks'][0]
+    url_or_title, skip = search_yt(track, search_for_extended_mix, search_for_clean_version)
+    if skip:
+        print(f"Could not find a high-quality match for {url_or_title} (and did not download).")
+    else:
+        download_youtube(url_or_title)
+
+
+def scrape_spotify(url):
+    extended=input("Search for extended mix? (Good for house/techno) (Y/N): ")
+    clean=input("Search for clean version? (Y/N): ")
+    search_for_extended_mix = len(extended) > 0 and extended[0].lower() == 'y'
+    search_for_clean_version = len(clean) > 0 and clean[0].lower() == 'y'
+
+    valid_url = False
+    if 'playlist' in url:
+        handle_playlist(url, search_for_extended_mix, search_for_clean_version)
+        valid_url = True
+    elif 'track' in url:
+        handle_track(url, search_for_extended_mix, search_for_clean_version)
+        valid_url = True
+    else:
+        print(f"ERROR: Cannot download tracks from the url: {url}")
+        print("Only playlists or single tracks are currently supported.")
+    return valid_url

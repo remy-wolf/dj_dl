@@ -57,13 +57,13 @@ class RenameAndWriteTagsPP(PostProcessor):
         return [], info  # return list_of_files_to_delete, info_dict
 
 
-def download(urls):
+def download_youtube(url, playlist_name=''):
     ydl_opts = {
         'format': 'mp3/bestaudio/best',
         'extractaudio': True,
         'writethumbnail': True,
         'allow_playlist_files': False,
-        'outtmpl': os.path.join('Downloads', '%(playlist_title|)s', '%(uploader)s - %(title)s.%(ext)s'),
+        'outtmpl': os.path.join('Downloads', playlist_name, '%(playlist_title|)s', '%(uploader)s - %(title)s.%(ext)s'),
         'postprocessors': [
             {  
                 # Extract audio using ffmpeg
@@ -77,12 +77,4 @@ def download(urls):
 
     with yt_dlp.YoutubeDL(ydl_opts) as ydl:
         ydl.add_post_processor(RenameAndWriteTagsPP())
-        error_code = ydl.download(urls)
-
-
-def main():
-    download(sys.argv[1:])
-
-
-if __name__ == "__main__":
-    main()
+        error_code = ydl.download(url)
