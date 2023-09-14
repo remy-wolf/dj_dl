@@ -3,11 +3,14 @@ A tool to download Spotify or YouTube playlists while maintaining a consistent n
 Please don't use this for commercial purposes!
 
 Installation:
-1) Ensure you have git, Python, and miniconda/anaconda installed on your system
-2) Clone this repo
-3) Open the Anaconda prompt, navigate to the install directory, and type the following command:
+1) Ensure you have [git](https://git-scm.com/), [Python](https://www.python.org/), and [miniconda](https://docs.conda.io/projects/miniconda/en/latest/) or [anaconda](https://www.anaconda.com/) installed on your system
+2) Clone this repo:\
+`cd path/to/desired/directory && git clone https://github.com/april-manhattan/dj_dl.git`
+3) Open the Anaconda prompt, navigate to the install directory, and run the following command to download the necessary Python dependencies:\
 `conda env create -f lib_dl-env.yml`
-4) Double-click on DJ_DL.bat to run the script
+4) Create a file named .env in src/ that contains the spotipy API keys
+5) Double-click on DJ_DL.bat to run the application
+
 
 Known issues/Future improvements:
 * Some songs get renamed with weird Unicode characters, which show up as Chinese characters in Rekordbox.
