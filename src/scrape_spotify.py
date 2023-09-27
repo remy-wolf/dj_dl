@@ -72,7 +72,7 @@ def rank_video(yt_result, sp_result, extended_mix = False, clean_version = False
             and (any (x in yt_title for x in EXTENDED_SEARCH_TERMS) or yt_duration >= duration_min + 40)
             and not (any (x in yt_title for x in EXTENDED_IGNORE_TERMS))):
         score += EXTENDED_MIX
-    if clean_version and not yt_result['isExplicit']: score += CLEAN_VERSION
+    if clean_version and yt_result['resultType'] == 'song' and not yt_result['isExplicit']: score += CLEAN_VERSION
     if yt_title in sp_title or sp_title in yt_title: score += TITLE_MATCH
     if yt_result['resultType'] == 'song': score += SONG_RESULT
     if yt_duration >= duration_min and yt_duration <= duration_max: score += DURATION_MATCH # allow small duration buffer
@@ -140,7 +140,7 @@ def handle_playlist(url, search_for_extended_mix = False, search_for_clean_versi
     download_youtube(urls, playlist_name)
     if len(skipped) > 0:
         skipped = ''.join(f"\n    {title}" for title in skipped)
-        print(f"Could not find a high-quality match for the following tracks (and did not download): {skipped}")
+        print(f"\nCould not find a high-quality match for the following tracks (and did not download): {skipped}")
 
 
 def handle_track(url, search_for_extended_mix = False, search_for_clean_version = False):
