@@ -1,21 +1,32 @@
 import os
 import string
+import json
 
 import spotipy
 from spotipy.oauth2 import SpotifyClientCredentials
 from ytmusicapi import YTMusic
-from dotenv import dotenv_values
 
 from download_youtube import download_youtube
 
-secrets = dotenv_values(os.path.join('src', '.env'))
-
+# init spotipy
+try:
+    with open(os.path.join('config', 'secrets.json')) as f:
+        secrets = json.load(f)
+    client_credentials_manager = SpotifyClientCredentials(
+        client_id=secrets['SPOTIPY_CLIENT_ID'], client_secret=secrets['SPOTIPY_CLIENT_SECRET']
+    )
+    sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
+    sp.available_markets() # dummy call to see if auth worked correctly
+except (
+    FileNotFoundError, json.decoder.JSONDecodeError, KeyError, spotipy.oauth2.SpotifyOauthError
+):
+    print("ERROR: API credentials missing or incorrectly configured. Please ensure that "
+          "config/secrets.json exists and contains the necessary credentials. Consult the "
+          "documentation for more info.")
+    exit()
 
 # get tracks from spotify playlist
 def get_playlist_tracks(playlist_url, start=None, end=None):
-    client_credentials_manager = SpotifyClientCredentials(client_id=secrets['SPOTIPY_CLIENT_ID'], client_secret=secrets['SPOTIPY_CLIENT_SECRET'])
-    sp = spotipy.Spotify(client_credentials_manager = client_credentials_manager)
-
     if not start:
         start = 0
     if not end:
