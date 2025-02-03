@@ -1,8 +1,0 @@
-name: lib_dl
-channels:
-  - conda-forge
-  - defaults
-dependencies:
-  - yt-dlp
-  - ytmusicapi
-  - spotipy
