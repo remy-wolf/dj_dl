@@ -4,4 +4,4 @@ __pycache__/
 Downloads/
 config/secrets.json
 *.cache
-venv/
+.venv/
