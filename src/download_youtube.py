@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 
 import yt_dlp
 from yt_dlp.postprocessor.common import PostProcessor
@@ -58,12 +59,17 @@ class RenameAndWriteTagsPP(PostProcessor):
 
 
 def download_youtube(url, playlist_name=''):
+    # load default download path from config
+    with open('config/config.json', 'r') as f:
+        config = json.load(f)
+    downloads_path = config.get('downloads_path', 'Downloads')
+
     ydl_opts = {
         'format': 'mp3/bestaudio/best',
         'extractaudio': True,
         'writethumbnail': True,
         'allow_playlist_files': False,
-        'outtmpl': os.path.join('Downloads', playlist_name, '%(playlist_title|)s', '%(uploader)s - %(title)s.%(ext)s'),
+        'outtmpl': os.path.join(downloads_path, playlist_name, '%(playlist_title|)s', '%(uploader)s - %(title)s.%(ext)s'),
         'postprocessors': [
             {  
                 # Extract audio using ffmpeg
