@@ -52,8 +52,8 @@ if ! command -v ffmpeg &> /dev/null; then
 fi
 
 # Check if this is an update (directory already exists)
-if [ -d "$HOME/DJ_DL/.git" ]; then
-    install_dir="$HOME/DJ_DL"
+if [ -d ".git" ]; then
+    install_dir="."
     echo "Updating existing installation..."
 else
     # Function to prompt for directory
@@ -90,14 +90,22 @@ fi
 
 cd "$install_dir"
 
+# Get branch from config if it exists
+if [ -f "config/config.json" ]; then
+    BRANCH=$(grep "git_branch" config/config.json | sed -E 's/.*"git_branch"[^"]*"([^"]+)".*/\1/') || BRANCH="main"
+else
+    BRANCH="main"
+fi
+
 # Clone or update repository
 if [ ! -d ".git" ]; then
     echo "Performing fresh installation..."
-    git clone https://github.com/remy-wolf/dj_dl.git .
+    git clone -b "$BRANCH" https://github.com/remy-wolf/dj_dl.git .
 else
     echo "Updating from repository..."
     git fetch
-    git reset --hard origin/main
+    git checkout "$BRANCH"
+    git reset --hard "origin/$BRANCH"
 fi
 
 # Create and activate virtual environment if it doesn't exist
@@ -119,9 +127,6 @@ Exec=bash $install_dir/DJ_DL.sh
 Type=Application
 Terminal=true" > "$desktop_file"
 chmod +x "$desktop_file"
-
-# Self-destruct this installer
-rm -- "$0"
 
 # Launch the program
 bash DJ_DL.sh 

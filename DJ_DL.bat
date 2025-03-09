@@ -11,6 +11,10 @@ echo python -m pip install -r requirements.txt
 goto end
 )
 
+:: Get branch from config using findstr
+for /f "tokens=2 delims=:, " %%a in ('findstr "git_branch" config\config.json') do set BRANCH=%%~a
+if not defined BRANCH set BRANCH=main
+
 :: Check for updates
 git remote update >nul 2>&1
 for /f %%i in ('git rev-parse @') do set LOCAL=%%i

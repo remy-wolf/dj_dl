@@ -42,8 +42,8 @@ if %errorlevel% neq 0 (
 )
 
 :: Check if this is an update (directory already exists)
-if exist "%USERPROFILE%\DJ_DL\.git" (
-    set "install_dir=%USERPROFILE%\DJ_DL"
+if exist ".git" (
+    set "install_dir=."
     echo Updating existing installation...
 ) else (
     :: Prompt for installation directory
@@ -65,14 +65,23 @@ if exist "%USERPROFILE%\DJ_DL\.git" (
 :: Navigate to installation directory
 cd /d "!install_dir!"
 
+:: Get branch from config if it exists
+if exist "config\config.json" (
+    for /f "tokens=2 delims=:, " %%a in ('findstr "git_branch" config\config.json') do set BRANCH=%%~a
+    if not defined BRANCH set BRANCH=main
+) else (
+    set BRANCH=main
+)
+
 :: Clone or update repository
 if not exist ".git" (
     echo Performing fresh installation...
-    git clone https://github.com/remy-wolf/dj_dl.git .
+    git clone -b %BRANCH% https://github.com/remy-wolf/dj_dl.git .
 ) else (
     echo Updating from repository...
     git fetch
-    git reset --hard origin/main
+    git checkout %BRANCH%
+    git reset --hard origin/%BRANCH%
 )
 
 :: Create and activate virtual environment if it doesn't exist
@@ -89,9 +98,6 @@ python -m pip install -r requirements.txt --upgrade
 :: Create/update desktop shortcut
 echo Updating desktop shortcut...
 powershell -Command "$WS = New-Object -ComObject WScript.Shell; $SC = $WS.CreateShortcut('%USERPROFILE%\Desktop\DJ_DL.lnk'); $SC.TargetPath = '!install_dir!\DJ_DL.bat'; $SC.Save()"
-
-:: Self-destruct this installer
-(goto) 2>nul & del "%~f0"
 
 :: Launch the program
 call DJ_DL.bat 

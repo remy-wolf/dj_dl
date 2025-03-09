@@ -3,6 +3,9 @@
 # Get the directory where this script is located
 cd "$(dirname "$0")"
 
+# Get branch from config using grep and sed
+BRANCH=$(grep "git_branch" config/config.json | sed -E 's/.*"git_branch"[^"]*"([^"]+)".*/\1/') || BRANCH="main"
+
 # Activate virtual environment
 source .venv/bin/activate
 
