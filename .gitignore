@@ -5,3 +5,4 @@ Downloads/
 config/secrets.json
 *.cache
 .venv/
+.DS_Store
